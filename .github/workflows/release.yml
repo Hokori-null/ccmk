@@ -6,84 +6,96 @@ on:
         - 'v[0-9]+.[0-9]+.[0-9]+'          # 匹配 vX.Y.Z 格式
         - '[0-9]+.[0-9]+.[0-9]+'           # 匹配 X.Y.Z 格式
         - 'v[0-9]+.[0-9]+.[0-9]+-[0-9]+'   # 匹配 vX.Y.Z-N 格式
-        - '[0-9]+.[0-9]+.[0-9]+-[0-9]+'
+        - '[0-9]+.[0-9]+.[0-9]+-[0-9]+'  
+  workflow_dispatch:
 
 jobs:
   build:
-    name: Build ${{ matrix.os }}-${{ matrix.arch }}
-    runs-on: ${{ matrix.os }}
+    env:
+      program_name: ccmk
     strategy:
       fail-fast: false
       matrix:
-        include:
-          # Linux builds
-          - os: ubuntu-latest
-            arch: x86_64
-            target: x86_64-unknown-linux-gnu
-            binary_name: ccmk
-          - os: ubuntu-latest
-            arch: aarch64
-            target: aarch64-unknown-linux-gnu
-            binary_name: ccmk
-          
-          # Windows builds
-          - os: windows-latest
-            arch: x86_64
-            target: x86_64-pc-windows-msvc
-            binary_name: ccmk.exe
-          - os: windows-latest
-            arch: aarch64
-            target: aarch64-pc-windows-msvc
-            binary_name: ccmk.exe
-          
-          # macOS builds (ARM only)
-          - os: macos-latest
-            arch: aarch64
-            target: aarch64-apple-darwin
-            binary_name: ccmk
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        arch: [amd64, arm64]
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Setup Rust
-        uses: actions-rs/toolchain@v1
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-          target: ${{ matrix.target }}
-          override: true
 
-      - name: Install cross-compilation tools for Linux ARM
-        if: matrix.os == 'ubuntu-latest' && matrix.arch == 'aarch64'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu
-
-      - name: Build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release --target ${{ matrix.target }}
-          use-cross: ${{ matrix.os == 'ubuntu-latest' && matrix.arch == 'aarch64' }}
-
-      - name: Prepare artifact
+      - name: Build for rust
         shell: bash
         run: |
-          mkdir -p release
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            cp target/${{ matrix.target }}/release/${{ matrix.binary_name }} release/
-          else
-            cp target/${{ matrix.target }}/release/${{ matrix.binary_name }} release/
+          #处理环境变量
+          arch=${{ matrix.arch }}
+          os=$RUNNER_OS
+          program_name=${{ env.program_name }}
+          
+          #处理不同系统架构差异
+          if [ "$os" == "Linux" ]; then
+            if [ "$arch" == "amd64" ]; then
+              target=x86_64-unknown-linux-gnu
+              linker=gcc
+            elif [ "$arch" == "arm64" ]; then
+              target=aarch64-unknown-linux-gnu
+              linker=aarch64-linux-gnu-gcc
+              sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
+            fi
+            suffix=""
+          elif [ "$os" == "Windows" ]; then
+            if [ "$arch" == "amd64" ]; then
+              target=x86_64-pc-windows-msvc
+              linker=link.exe
+            elif [ "$arch" == "arm64" ]; then
+              target=aarch64-pc-windows-msvc
+              linker=link.exe
+            fi
+            suffix=".exe"
+          elif [ "$os" == "macOS" ]; then
+            if [ "$arch" == "amd64" ]; then
+              target=x86_64-apple-darwin
+              linker=clang
+            elif [ "$arch" == "arm64" ]; then
+              target=aarch64-apple-darwin
+              linker=clang
+            fi
+            suffix=""
           fi
+          echo "当前环境：$os/$arch"
+          echo "当前rust工具链版本"
+          rustc --version
+
+          #添加目标架构配置
+          rustup target add ${target}
+          mkdir -p .cargo
+          cat <<EOL > "./.cargo/config.toml"
+          [target.${target}]
+          linker = "${linker}"
+          EOL
+
+          #开始编译
+          echo "开始编译"
+          echo "目标：${target}"
+          cargo build --release --target=${target}
+          
+          #准备构建产物
+          mkdir -p release
+          cp target/${target}/release/${program_name}${suffix} release/
           cd release
-          tar -czvf ccmk-${{ matrix.target }}.tar.gz ${{ matrix.binary_name }}
+          tar -czvf ${program_name}-${target}.tar.gz ${program_name}${suffix}
           cd ..
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v3
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
         with:
-          name: ccmk-${{ matrix.target }}
-          path: release/ccmk-${{ matrix.target }}.tar.gz
+          name: ${{ env.program_name }}-${{ matrix.os }}-${{ matrix.arch }}
+          path: release/*.tar.gz
 
   release:
     name: Create Release
@@ -91,10 +103,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: release
 
