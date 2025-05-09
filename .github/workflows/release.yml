@@ -24,6 +24,12 @@ jobs:
         toolchain: stable
         target: ${{ matrix.arch }}-${{ matrix.os == 'windows-latest' && 'pc-windows-msvc' || matrix.os == 'macos-latest' && 'apple-darwin' || 'unknown-linux-gnu' }}
 
+    - name: Install cross-compilation dependencies
+      if: matrix.os == 'ubuntu-latest' && matrix.arch == 'aarch64'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gcc-aarch64-linux-gnu
+
     - name: Build
       run: cargo build --release --target ${{ matrix.arch }}-${{ matrix.os == 'windows-latest' && 'pc-windows-msvc' || matrix.os == 'macos-latest' && 'apple-darwin' || 'unknown-linux-gnu' }}
 
