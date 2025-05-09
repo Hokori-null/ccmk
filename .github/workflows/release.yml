@@ -38,7 +38,7 @@ jobs:
         fi
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4.6.2
       with:
         name: ccmk-${{ matrix.os }}-${{ matrix.arch }}
         path: artifacts/
@@ -51,7 +51,7 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Download all artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4.3.0
       with:
         path: artifacts
 
