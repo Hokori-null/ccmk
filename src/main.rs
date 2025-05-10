@@ -16,7 +16,7 @@ fn generate_cmakelists(
     ];
 
     // 添加C++标准设置
-    if lang == "cpp" {
+    if lang == "cxx" {
         lines.push(format!("set(CMAKE_CXX_STANDARD {})", cxx_standard));
         lines.push("set(CMAKE_CXX_STANDARD_REQUIRED ON)".to_string());
         lines.push("".to_string());
@@ -27,15 +27,15 @@ fn generate_cmakelists(
         "exe" => {
             lines.push(format!(
                 "add_executable({} src/main.{})",
-                project_name,
-                if lang == "c" { "c" } else { "cpp" }
+               project_name,
+               if lang == "c" { "c" } else { "cpp" }, // 使用.cpp扩展名但CMake语言为CXX
             ));
         }
         "static_lib" => {
             lines.push(format!(
                 "add_library({} STATIC src/main.{})",
-                project_name,
-                if lang == "c" { "c" } else { "cpp" }
+               project_name,
+               if lang == "c" { "c" } else { "cpp" }, // 使用.cpp扩展名但CMake语言为CXX
             ));
             lines.push(format!("target_include_directories({} PRIVATE include)", project_name));
             lines.push(format!(
@@ -106,7 +106,7 @@ fn main() -> Result<(), inquire::InquireError> {
         output_path.join("CMakeLists.txt"),
         generate_cmakelists(
             &project_name,
-            if lang == "C" { "c" } else { "cpp" },
+            if lang == "C" { "c" } else { "cxx" },
             match project_type {
                 "Executable" => "exe",
                 "Static Library" => "static_lib",
@@ -117,7 +117,7 @@ fn main() -> Result<(), inquire::InquireError> {
     )?;
     
     // 写入示例源文件
-    let source_ext = if lang == "C" { "c" } else { "cpp" };
+    let source_ext = if lang == "C" { "c" } else { "cpp" }; // 源文件扩展名保持.cpp，CMake语言使用CXX
     fs::write(
         output_path.join("src").join(format!("main.{}", source_ext)),
         generate_source_file(if lang == "C" { "c" } else { "cpp" }),
