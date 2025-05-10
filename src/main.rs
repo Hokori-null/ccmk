@@ -10,7 +10,7 @@ fn generate_cmakelists(
     cxx_standard: &str,
 ) -> String {
     let mut lines = vec![
-        "cmake_minimum_required(VERSION 3.14)".to_string(),
+        "cmake_minimum_required(VERSION 3.20)".to_string(),
         format!("project({} LANGUAGES {})", project_name, lang.to_uppercase()),
         "".to_string(),
     ];
